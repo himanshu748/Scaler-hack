@@ -1,0 +1,1316 @@
+"""
+Problem bank for the API Design RL environment.
+
+Each problem defines:
+  - id, difficulty, title, description, constraints
+  - ground_truth: the reference endpoint list the grader compares against
+"""
+
+from typing import Any, Dict, List, TypedDict
+
+
+class GroundTruthEndpoint(TypedDict, total=False):
+    method: str
+    path: str
+    description: str
+    request_body: Dict[str, Any]
+    response_body: Dict[str, Any]
+    status_code: int
+    query_params: List[str]
+
+
+class Problem(TypedDict):
+    id: str
+    difficulty: str
+    title: str
+    description: str
+    constraints: List[str]
+    ground_truth: List[GroundTruthEndpoint]
+
+
+PROBLEMS: List[Problem] = [
+    # ── EASY ─────────────────────────────────────────────────────────
+    {
+        "id": "todo_crud",
+        "difficulty": "easy",
+        "title": "Todo List CRUD API",
+        "description": (
+            "Design a REST API for a simple todo-list application. "
+            "Users should be able to create, read, update, and delete todo items. "
+            "Each todo has a title, description, and completed status."
+        ),
+        "constraints": [
+            "Support listing all todos with optional filtering by completed status",
+            "Support getting a single todo by ID",
+            "Support creating a new todo",
+            "Support updating an existing todo",
+            "Support deleting a todo",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/todos",
+                "description": "List all todos",
+                "request_body": {},
+                "response_body": {"todos": "list", "count": "int"},
+                "status_code": 200,
+                "query_params": ["completed", "limit", "offset"],
+            },
+            {
+                "method": "GET",
+                "path": "/todos/{id}",
+                "description": "Get a single todo by ID",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "title": "string",
+                    "description": "string",
+                    "completed": "bool",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/todos",
+                "description": "Create a new todo",
+                "request_body": {
+                    "title": "string",
+                    "description": "string",
+                },
+                "response_body": {
+                    "id": "int",
+                    "title": "string",
+                    "description": "string",
+                    "completed": "bool",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/todos/{id}",
+                "description": "Update a todo",
+                "request_body": {
+                    "title": "string",
+                    "description": "string",
+                    "completed": "bool",
+                },
+                "response_body": {
+                    "id": "int",
+                    "title": "string",
+                    "description": "string",
+                    "completed": "bool",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/todos/{id}",
+                "description": "Delete a todo",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+        ],
+    },
+    {
+        "id": "bookmark_manager",
+        "difficulty": "easy",
+        "title": "Bookmark Manager API",
+        "description": (
+            "Design a REST API for a personal bookmark manager. "
+            "Users can save, organise, and search their bookmarks. "
+            "Each bookmark has a URL, title, optional description, and tags."
+        ),
+        "constraints": [
+            "Support listing bookmarks with search by title or tag",
+            "Support creating a bookmark",
+            "Support updating a bookmark",
+            "Support deleting a bookmark",
+            "Support listing all tags in use",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/bookmarks",
+                "description": "List bookmarks",
+                "request_body": {},
+                "response_body": {"bookmarks": "list", "count": "int"},
+                "status_code": 200,
+                "query_params": ["search", "tag", "limit", "offset"],
+            },
+            {
+                "method": "GET",
+                "path": "/bookmarks/{id}",
+                "description": "Get a single bookmark",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "url": "string",
+                    "title": "string",
+                    "description": "string",
+                    "tags": "list",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/bookmarks",
+                "description": "Create a bookmark",
+                "request_body": {
+                    "url": "string",
+                    "title": "string",
+                    "tags": "list",
+                },
+                "response_body": {
+                    "id": "int",
+                    "url": "string",
+                    "title": "string",
+                    "tags": "list",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/bookmarks/{id}",
+                "description": "Update a bookmark",
+                "request_body": {
+                    "url": "string",
+                    "title": "string",
+                    "tags": "list",
+                },
+                "response_body": {
+                    "id": "int",
+                    "url": "string",
+                    "title": "string",
+                    "tags": "list",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/bookmarks/{id}",
+                "description": "Delete a bookmark",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/tags",
+                "description": "List all tags",
+                "request_body": {},
+                "response_body": {"tags": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+        ],
+    },
+    {
+        "id": "notes_app",
+        "difficulty": "easy",
+        "title": "Notes App API",
+        "description": (
+            "Design a REST API for a simple note-taking application. "
+            "Users can create, read, update, and delete notes. "
+            "Notes have a title, body, and created/updated timestamps."
+        ),
+        "constraints": [
+            "Support listing notes sorted by last updated",
+            "Support getting a single note",
+            "Support creating a note",
+            "Support updating a note",
+            "Support deleting a note",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/notes",
+                "description": "List all notes",
+                "request_body": {},
+                "response_body": {"notes": "list", "count": "int"},
+                "status_code": 200,
+                "query_params": ["sort", "limit", "offset"],
+            },
+            {
+                "method": "GET",
+                "path": "/notes/{id}",
+                "description": "Get a note",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "title": "string",
+                    "body": "string",
+                    "created_at": "string",
+                    "updated_at": "string",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/notes",
+                "description": "Create a note",
+                "request_body": {"title": "string", "body": "string"},
+                "response_body": {
+                    "id": "int",
+                    "title": "string",
+                    "body": "string",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/notes/{id}",
+                "description": "Update a note",
+                "request_body": {"title": "string", "body": "string"},
+                "response_body": {
+                    "id": "int",
+                    "title": "string",
+                    "body": "string",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/notes/{id}",
+                "description": "Delete a note",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+        ],
+    },
+    {
+        "id": "contacts_api",
+        "difficulty": "easy",
+        "title": "Contacts API",
+        "description": (
+            "Design a REST API for managing personal contacts. "
+            "Each contact has a name, email, phone, and optional company."
+        ),
+        "constraints": [
+            "List contacts with search by name or email",
+            "Get single contact",
+            "Create contact",
+            "Update contact",
+            "Delete contact",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/contacts",
+                "description": "List contacts",
+                "request_body": {},
+                "response_body": {"contacts": "list", "count": "int"},
+                "status_code": 200,
+                "query_params": ["search", "limit", "offset"],
+            },
+            {
+                "method": "GET",
+                "path": "/contacts/{id}",
+                "description": "Get contact",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "name": "string",
+                    "email": "string",
+                    "phone": "string",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/contacts",
+                "description": "Create contact",
+                "request_body": {
+                    "name": "string",
+                    "email": "string",
+                    "phone": "string",
+                },
+                "response_body": {
+                    "id": "int",
+                    "name": "string",
+                    "email": "string",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/contacts/{id}",
+                "description": "Update contact",
+                "request_body": {
+                    "name": "string",
+                    "email": "string",
+                    "phone": "string",
+                },
+                "response_body": {
+                    "id": "int",
+                    "name": "string",
+                    "email": "string",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/contacts/{id}",
+                "description": "Delete contact",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+        ],
+    },
+    # ── MEDIUM ───────────────────────────────────────────────────────
+    {
+        "id": "ecommerce_products",
+        "difficulty": "medium",
+        "title": "E-Commerce Product Catalog API",
+        "description": (
+            "Design a REST API for an e-commerce product catalog. "
+            "Products belong to categories, have images, variants "
+            "(size/color), pricing, and inventory counts. "
+            "Support filtering, sorting, and pagination."
+        ),
+        "constraints": [
+            "List products with filtering by category, price range, and availability",
+            "Support sorting by price, name, or created date",
+            "CRUD for products",
+            "Manage product categories",
+            "Manage product variants (size, color, stock)",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/products",
+                "description": "List products with filters",
+                "request_body": {},
+                "response_body": {"products": "list", "total": "int"},
+                "status_code": 200,
+                "query_params": [
+                    "category",
+                    "min_price",
+                    "max_price",
+                    "in_stock",
+                    "sort",
+                    "limit",
+                    "offset",
+                ],
+            },
+            {
+                "method": "GET",
+                "path": "/products/{id}",
+                "description": "Get product details",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "name": "string",
+                    "price": "float",
+                    "category": "string",
+                    "variants": "list",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/products",
+                "description": "Create product",
+                "request_body": {
+                    "name": "string",
+                    "price": "float",
+                    "category_id": "int",
+                    "description": "string",
+                },
+                "response_body": {"id": "int", "name": "string", "price": "float"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/products/{id}",
+                "description": "Update product",
+                "request_body": {
+                    "name": "string",
+                    "price": "float",
+                    "description": "string",
+                },
+                "response_body": {"id": "int", "name": "string", "price": "float"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/products/{id}",
+                "description": "Delete product",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/categories",
+                "description": "List categories",
+                "request_body": {},
+                "response_body": {"categories": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/categories",
+                "description": "Create category",
+                "request_body": {"name": "string"},
+                "response_body": {"id": "int", "name": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/products/{id}/variants",
+                "description": "List product variants",
+                "request_body": {},
+                "response_body": {"variants": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/products/{id}/variants",
+                "description": "Create product variant",
+                "request_body": {
+                    "size": "string",
+                    "color": "string",
+                    "stock": "int",
+                    "price_modifier": "float",
+                },
+                "response_body": {
+                    "id": "int",
+                    "size": "string",
+                    "color": "string",
+                    "stock": "int",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+        ],
+    },
+    {
+        "id": "blog_platform",
+        "difficulty": "medium",
+        "title": "Blog Platform API",
+        "description": (
+            "Design a REST API for a blog platform. "
+            "Authors write posts, readers leave comments. "
+            "Posts can be drafted or published, and have tags."
+        ),
+        "constraints": [
+            "CRUD for blog posts",
+            "Support draft and published states for posts",
+            "CRUD for comments on a post",
+            "List posts with filtering by author, tag, and status",
+            "Manage tags",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/posts",
+                "description": "List posts",
+                "request_body": {},
+                "response_body": {"posts": "list", "total": "int"},
+                "status_code": 200,
+                "query_params": ["author", "tag", "status", "limit", "offset"],
+            },
+            {
+                "method": "GET",
+                "path": "/posts/{id}",
+                "description": "Get a post",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "title": "string",
+                    "body": "string",
+                    "status": "string",
+                    "author": "string",
+                    "tags": "list",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/posts",
+                "description": "Create a post",
+                "request_body": {
+                    "title": "string",
+                    "body": "string",
+                    "tags": "list",
+                    "status": "string",
+                },
+                "response_body": {"id": "int", "title": "string", "status": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/posts/{id}",
+                "description": "Update a post",
+                "request_body": {
+                    "title": "string",
+                    "body": "string",
+                    "tags": "list",
+                    "status": "string",
+                },
+                "response_body": {"id": "int", "title": "string", "status": "string"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/posts/{id}",
+                "description": "Delete a post",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "PATCH",
+                "path": "/posts/{id}",
+                "description": "Publish or unpublish a post",
+                "request_body": {"status": "string"},
+                "response_body": {"id": "int", "status": "string"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/posts/{post_id}/comments",
+                "description": "List comments on a post",
+                "request_body": {},
+                "response_body": {"comments": "list", "count": "int"},
+                "status_code": 200,
+                "query_params": ["limit", "offset"],
+            },
+            {
+                "method": "POST",
+                "path": "/posts/{post_id}/comments",
+                "description": "Add a comment",
+                "request_body": {"body": "string", "author": "string"},
+                "response_body": {"id": "int", "body": "string", "author": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/posts/{post_id}/comments/{id}",
+                "description": "Delete a comment",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/tags",
+                "description": "List tags",
+                "request_body": {},
+                "response_body": {"tags": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+        ],
+    },
+    {
+        "id": "event_management",
+        "difficulty": "medium",
+        "title": "Event Management API",
+        "description": (
+            "Design a REST API for an event management platform. "
+            "Organisers create events, attendees register. "
+            "Events have dates, locations, capacity limits, and ticket types."
+        ),
+        "constraints": [
+            "CRUD for events",
+            "Register and unregister attendees for an event",
+            "List events with filtering by date range and location",
+            "Manage ticket types per event",
+            "Get attendee list for an event",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/events",
+                "description": "List events",
+                "request_body": {},
+                "response_body": {"events": "list", "total": "int"},
+                "status_code": 200,
+                "query_params": [
+                    "start_date",
+                    "end_date",
+                    "location",
+                    "limit",
+                    "offset",
+                ],
+            },
+            {
+                "method": "GET",
+                "path": "/events/{id}",
+                "description": "Get event details",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "title": "string",
+                    "date": "string",
+                    "location": "string",
+                    "capacity": "int",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/events",
+                "description": "Create event",
+                "request_body": {
+                    "title": "string",
+                    "date": "string",
+                    "location": "string",
+                    "capacity": "int",
+                },
+                "response_body": {"id": "int", "title": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/events/{id}",
+                "description": "Update event",
+                "request_body": {
+                    "title": "string",
+                    "date": "string",
+                    "location": "string",
+                },
+                "response_body": {"id": "int", "title": "string"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/events/{id}",
+                "description": "Delete event",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/events/{event_id}/registrations",
+                "description": "Register attendee",
+                "request_body": {
+                    "attendee_name": "string",
+                    "email": "string",
+                    "ticket_type": "string",
+                },
+                "response_body": {"id": "int", "attendee_name": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/events/{event_id}/registrations/{id}",
+                "description": "Unregister attendee",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/events/{event_id}/registrations",
+                "description": "List attendees",
+                "request_body": {},
+                "response_body": {"registrations": "list", "count": "int"},
+                "status_code": 200,
+                "query_params": ["limit", "offset"],
+            },
+            {
+                "method": "GET",
+                "path": "/events/{event_id}/tickets",
+                "description": "List ticket types",
+                "request_body": {},
+                "response_body": {"tickets": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/events/{event_id}/tickets",
+                "description": "Create ticket type",
+                "request_body": {
+                    "name": "string",
+                    "price": "float",
+                    "quantity": "int",
+                },
+                "response_body": {"id": "int", "name": "string", "price": "float"},
+                "status_code": 201,
+                "query_params": [],
+            },
+        ],
+    },
+    {
+        "id": "task_board",
+        "difficulty": "medium",
+        "title": "Kanban Task Board API",
+        "description": (
+            "Design a REST API for a kanban-style task board. "
+            "Boards contain columns, columns contain cards. "
+            "Cards can be assigned to users and have labels."
+        ),
+        "constraints": [
+            "CRUD for boards",
+            "CRUD for columns within a board",
+            "CRUD for cards within a column",
+            "Assign and unassign users to cards",
+            "Move cards between columns",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/boards",
+                "description": "List boards",
+                "request_body": {},
+                "response_body": {"boards": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/boards",
+                "description": "Create board",
+                "request_body": {"name": "string"},
+                "response_body": {"id": "int", "name": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/boards/{board_id}/columns",
+                "description": "List columns",
+                "request_body": {},
+                "response_body": {"columns": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/boards/{board_id}/columns",
+                "description": "Create column",
+                "request_body": {"name": "string", "position": "int"},
+                "response_body": {"id": "int", "name": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/columns/{column_id}/cards",
+                "description": "List cards in column",
+                "request_body": {},
+                "response_body": {"cards": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/columns/{column_id}/cards",
+                "description": "Create card",
+                "request_body": {
+                    "title": "string",
+                    "description": "string",
+                    "labels": "list",
+                },
+                "response_body": {"id": "int", "title": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/cards/{id}",
+                "description": "Update card",
+                "request_body": {"title": "string", "description": "string"},
+                "response_body": {"id": "int", "title": "string"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "PATCH",
+                "path": "/cards/{id}/move",
+                "description": "Move card to another column",
+                "request_body": {"column_id": "int", "position": "int"},
+                "response_body": {"id": "int", "column_id": "int"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/cards/{card_id}/assignees",
+                "description": "Assign user to card",
+                "request_body": {"user_id": "int"},
+                "response_body": {"card_id": "int", "user_id": "int"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/cards/{card_id}/assignees/{user_id}",
+                "description": "Unassign user",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+        ],
+    },
+    # ── HARD ─────────────────────────────────────────────────────────
+    {
+        "id": "multi_tenant_saas",
+        "difficulty": "hard",
+        "title": "Multi-Tenant SaaS API with RBAC",
+        "description": (
+            "Design a REST API for a multi-tenant SaaS platform. "
+            "Each tenant (organisation) has users with different roles "
+            "(admin, editor, viewer). Admins manage users and settings. "
+            "The API must scope all resources to their tenant."
+        ),
+        "constraints": [
+            "CRUD for tenants (organisations)",
+            "Manage users within a tenant",
+            "Role-based access: admin, editor, viewer",
+            "Invite users to a tenant",
+            "Tenant-level settings management",
+            "All resource paths scoped under /tenants/{tenant_id}",
+        ],
+        "ground_truth": [
+            {
+                "method": "POST",
+                "path": "/tenants",
+                "description": "Create tenant",
+                "request_body": {"name": "string", "plan": "string"},
+                "response_body": {"id": "int", "name": "string", "plan": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/tenants/{tenant_id}",
+                "description": "Get tenant details",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "name": "string",
+                    "plan": "string",
+                    "user_count": "int",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/tenants/{tenant_id}",
+                "description": "Update tenant",
+                "request_body": {"name": "string", "plan": "string"},
+                "response_body": {"id": "int", "name": "string"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/tenants/{tenant_id}/users",
+                "description": "List tenant users",
+                "request_body": {},
+                "response_body": {"users": "list", "count": "int"},
+                "status_code": 200,
+                "query_params": ["role", "limit", "offset"],
+            },
+            {
+                "method": "POST",
+                "path": "/tenants/{tenant_id}/users",
+                "description": "Add user to tenant",
+                "request_body": {
+                    "email": "string",
+                    "name": "string",
+                    "role": "string",
+                },
+                "response_body": {
+                    "id": "int",
+                    "email": "string",
+                    "role": "string",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PATCH",
+                "path": "/tenants/{tenant_id}/users/{user_id}",
+                "description": "Update user role",
+                "request_body": {"role": "string"},
+                "response_body": {"id": "int", "role": "string"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/tenants/{tenant_id}/users/{user_id}",
+                "description": "Remove user from tenant",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/tenants/{tenant_id}/invitations",
+                "description": "Invite user",
+                "request_body": {"email": "string", "role": "string"},
+                "response_body": {
+                    "id": "int",
+                    "email": "string",
+                    "status": "string",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/tenants/{tenant_id}/settings",
+                "description": "Get tenant settings",
+                "request_body": {},
+                "response_body": {"settings": "dict"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/tenants/{tenant_id}/settings",
+                "description": "Update tenant settings",
+                "request_body": {"settings": "dict"},
+                "response_body": {"settings": "dict"},
+                "status_code": 200,
+                "query_params": [],
+            },
+        ],
+    },
+    {
+        "id": "file_storage_api",
+        "difficulty": "hard",
+        "title": "Cloud File Storage API",
+        "description": (
+            "Design a REST API for a cloud file storage service (like a "
+            "simplified Dropbox). Support folders, files, sharing, and "
+            "version history."
+        ),
+        "constraints": [
+            "CRUD for folders (nested hierarchy)",
+            "Upload, download, rename, and delete files",
+            "Share files/folders with other users (read/write permissions)",
+            "List file version history",
+            "Move files between folders",
+            "Search files by name",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/folders/{id}",
+                "description": "Get folder contents",
+                "request_body": {},
+                "response_body": {
+                    "id": "int",
+                    "name": "string",
+                    "files": "list",
+                    "subfolders": "list",
+                },
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/folders",
+                "description": "Create folder",
+                "request_body": {"name": "string", "parent_id": "int"},
+                "response_body": {"id": "int", "name": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/folders/{id}",
+                "description": "Delete folder",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/files",
+                "description": "Upload file",
+                "request_body": {
+                    "name": "string",
+                    "folder_id": "int",
+                    "content": "binary",
+                },
+                "response_body": {
+                    "id": "int",
+                    "name": "string",
+                    "size": "int",
+                    "version": "int",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/files/{id}",
+                "description": "Download file",
+                "request_body": {},
+                "response_body": {"content": "binary", "name": "string"},
+                "status_code": 200,
+                "query_params": ["version"],
+            },
+            {
+                "method": "PUT",
+                "path": "/files/{id}",
+                "description": "Update file metadata",
+                "request_body": {"name": "string"},
+                "response_body": {"id": "int", "name": "string"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/files/{id}",
+                "description": "Delete file",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "PATCH",
+                "path": "/files/{id}/move",
+                "description": "Move file to folder",
+                "request_body": {"folder_id": "int"},
+                "response_body": {"id": "int", "folder_id": "int"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/files/{id}/versions",
+                "description": "List file versions",
+                "request_body": {},
+                "response_body": {"versions": "list"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/files/{id}/share",
+                "description": "Share file with user",
+                "request_body": {
+                    "user_id": "int",
+                    "permission": "string",
+                },
+                "response_body": {
+                    "id": "int",
+                    "user_id": "int",
+                    "permission": "string",
+                },
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/files/search",
+                "description": "Search files",
+                "request_body": {},
+                "response_body": {"files": "list", "count": "int"},
+                "status_code": 200,
+                "query_params": ["query", "folder_id", "limit", "offset"],
+            },
+        ],
+    },
+    {
+        "id": "messaging_platform",
+        "difficulty": "hard",
+        "title": "Real-Time Messaging API",
+        "description": (
+            "Design a REST API for a messaging platform. "
+            "Users create channels, send messages, react to messages, "
+            "and manage channel membership. Support threads and pinning."
+        ),
+        "constraints": [
+            "CRUD for channels",
+            "Send, edit, and delete messages in a channel",
+            "Thread replies on messages",
+            "React to messages with emoji",
+            "Manage channel members (add/remove/list)",
+            "Pin and unpin messages",
+        ],
+        "ground_truth": [
+            {
+                "method": "GET",
+                "path": "/channels",
+                "description": "List channels",
+                "request_body": {},
+                "response_body": {"channels": "list"},
+                "status_code": 200,
+                "query_params": ["limit", "offset"],
+            },
+            {
+                "method": "POST",
+                "path": "/channels",
+                "description": "Create channel",
+                "request_body": {"name": "string", "description": "string"},
+                "response_body": {"id": "int", "name": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/channels/{channel_id}/messages",
+                "description": "List messages",
+                "request_body": {},
+                "response_body": {"messages": "list"},
+                "status_code": 200,
+                "query_params": ["before", "after", "limit"],
+            },
+            {
+                "method": "POST",
+                "path": "/channels/{channel_id}/messages",
+                "description": "Send message",
+                "request_body": {"content": "string"},
+                "response_body": {"id": "int", "content": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "PUT",
+                "path": "/channels/{channel_id}/messages/{id}",
+                "description": "Edit message",
+                "request_body": {"content": "string"},
+                "response_body": {"id": "int", "content": "string"},
+                "status_code": 200,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/channels/{channel_id}/messages/{id}",
+                "description": "Delete message",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/messages/{message_id}/reactions",
+                "description": "React to message",
+                "request_body": {"emoji": "string"},
+                "response_body": {"message_id": "int", "emoji": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/messages/{message_id}/reactions/{emoji}",
+                "description": "Remove reaction",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "GET",
+                "path": "/messages/{message_id}/thread",
+                "description": "Get thread replies",
+                "request_body": {},
+                "response_body": {"replies": "list"},
+                "status_code": 200,
+                "query_params": ["limit", "offset"],
+            },
+            {
+                "method": "POST",
+                "path": "/messages/{message_id}/thread",
+                "description": "Reply in thread",
+                "request_body": {"content": "string"},
+                "response_body": {"id": "int", "content": "string"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/channels/{channel_id}/members",
+                "description": "Add member",
+                "request_body": {"user_id": "int"},
+                "response_body": {"channel_id": "int", "user_id": "int"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/channels/{channel_id}/members/{user_id}",
+                "description": "Remove member",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+            {
+                "method": "POST",
+                "path": "/channels/{channel_id}/pins",
+                "description": "Pin message",
+                "request_body": {"message_id": "int"},
+                "response_body": {"channel_id": "int", "message_id": "int"},
+                "status_code": 201,
+                "query_params": [],
+            },
+            {
+                "method": "DELETE",
+                "path": "/channels/{channel_id}/pins/{message_id}",
+                "description": "Unpin message",
+                "request_body": {},
+                "response_body": {},
+                "status_code": 204,
+                "query_params": [],
+            },
+        ],
+    },
+]
+
+
+def get_problem(problem_id: str) -> Problem:
+    for p in PROBLEMS:
+        if p["id"] == problem_id:
+            return p
+    raise ValueError(f"Unknown problem: {problem_id}")
+
+
+def get_problems_by_difficulty(difficulty: str) -> List[Problem]:
+    return [p for p in PROBLEMS if p["difficulty"] == difficulty]

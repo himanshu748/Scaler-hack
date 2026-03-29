@@ -1,0 +1,7 @@
+name: api_design_env
+version: "1.0.0"
+description: >
+  RL environment for training AI agents to design REST APIs.
+  Given functional requirements, the agent submits endpoint specifications
+  and receives multi-dimensional feedback (completeness, RESTful conventions,
+  schema quality, consistency, HTTP semantics).

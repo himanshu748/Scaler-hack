@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "api-design-env"
+version = "1.0.0"
+description = "OpenEnv RL environment for training agents to design REST APIs"
+requires-python = ">=3.10"
+dependencies = [
+    "openenv-core>=0.2.2",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+]
+
+[project.scripts]
+server = "uvicorn:main"
+
+[tool.setuptools.packages.find]
+include = ["api_design_env*"]
