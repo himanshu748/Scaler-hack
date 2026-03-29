@@ -95,7 +95,7 @@ def score_completeness(
 def score_restful_conventions(
     submitted: List[Dict[str, Any]],
 ) -> Tuple[float, List[str]]:
-    """Check plural nouns, proper nesting, no verbs in paths."""
+    """Check plural nouns, proper nesting, no verbs in paths, param naming."""
     if not submitted:
         return 0.0, ["No endpoints submitted"]
 
@@ -106,6 +106,9 @@ def score_restful_conventions(
     verb_patterns = re.compile(
         r"/(get|create|update|delete|remove|add|fetch|list|set|make)", re.I
     )
+    action_suffixes = re.compile(
+        r"/(cancel|retry|move|search|login|logout|approve|reject)$", re.I
+    )
 
     for ep in submitted:
         path = ep.get("path", "")
@@ -115,14 +118,17 @@ def score_restful_conventions(
         # Check: resource segments should be plural nouns
         for seg in segments:
             total_checks += 1
-            if _is_plural(seg) or seg in ("search", "health", "auth", "login", "me"):
+            if _is_plural(seg) or seg in (
+                "search", "health", "auth", "login", "me", "cancel",
+                "retry", "move", "logout", "approve", "reject",
+            ):
                 checks_passed += 1
             else:
                 suggestions.append(f"Consider plural noun: '{seg}' -> '{seg}s'?")
 
-        # Check: no verbs in path (except move/search which are common)
+        # Check: no verbs in path (allow action suffixes like /cancel, /retry)
         total_checks += 1
-        if verb_patterns.search(path) and "/move" not in path and "/search" not in path:
+        if verb_patterns.search(path) and not action_suffixes.search(path):
             suggestions.append(f"Avoid verbs in path: {path}")
         else:
             checks_passed += 1
@@ -133,6 +139,27 @@ def score_restful_conventions(
             checks_passed += 1
         else:
             suggestions.append(f"Invalid HTTP method: {method}")
+
+        # Check: path params use descriptive names for nested resources
+        # e.g. /posts/{post_id}/comments is better than /posts/{id}/comments/{id}
+        params = _PATH_PARAM_RE.findall(path)
+        if len(params) > 1:
+            total_checks += 1
+            param_names = [p.strip("{}") for p in params]
+            if len(param_names) == len(set(param_names)):
+                checks_passed += 1
+            else:
+                suggestions.append(
+                    f"Use unique param names in nested paths: {path}"
+                )
+
+        # Check: nesting depth <= 4 segments (overly deep nesting is an anti-pattern)
+        total_checks += 1
+        depth = path.strip("/").count("/") + 1
+        if depth <= 6:
+            checks_passed += 1
+        else:
+            suggestions.append(f"Path too deeply nested ({depth} segments): {path}")
 
     score = checks_passed / total_checks if total_checks else 0.0
     return round(min(score, 1.0), 4), suggestions[:5]

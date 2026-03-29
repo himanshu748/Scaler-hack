@@ -139,6 +139,7 @@ agent can use to iteratively improve.
 | `multi_tenant_saas` | Multi-Tenant SaaS | 10 | Tenant-scoped users, RBAC, invitations, settings |
 | `file_storage_api` | Cloud File Storage | 11 | Folders, files, versions, sharing, search |
 | `messaging_platform` | Messaging Platform | 14 | Channels, messages, threads, reactions, pins |
+| `ci_cd_pipeline_api` | CI/CD Pipeline Orchestration | 18 | Pipelines, runs, jobs, logs, artifacts, webhooks, secrets |
 
 Every problem has a deterministic ground-truth solution.  The grader compares
 the agent's submission against it structurally (path patterns, methods, schema
@@ -242,9 +243,9 @@ python -m api_design_env --json    # Machine-readable JSON
 
 | Agent | Mean | Min | Max | Easy | Medium | Hard |
 |---|---|---|---|---|---|---|
-| **random** | 0.42 | 0.42 | 0.42 | 0.42 | 0.42 | 0.42 |
-| **heuristic** | 0.64 | 0.43 | 0.96 | 0.57 | 0.69 | 0.66 |
-| **oracle** | 0.99 | 0.96 | 1.00 | 1.00 | 1.00 | 0.98 |
+| **random** | 0.35 | 0.35 | 0.40 | 0.35 | 0.35 | 0.36 |
+| **heuristic** | 0.59 | 0.28 | 0.96 | 0.45 | 0.67 | 0.66 |
+| **oracle** | 1.00 | 0.96 | 1.00 | 1.00 | 1.00 | 0.99 |
 
 - **random** -- generates structurally valid but content-irrelevant endpoints.
 - **heuristic** -- parses requirement text to extract resource names and
@@ -296,7 +297,7 @@ api_design_env/
     ├── app.py               # FastAPI application
     ├── environment.py       # Core RL logic (reset/step/state)
     ├── grader.py            # Multi-dimensional scoring engine
-    ├── problems.py          # 11 curated problems with ground truths
+    ├── problems.py          # 12 curated problems with ground truths
     ├── Dockerfile           # Alternative Dockerfile
     └── requirements.txt
 tests/
