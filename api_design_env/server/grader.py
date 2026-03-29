@@ -426,7 +426,7 @@ def compute_penalty(
             f"Too many endpoints ({len(submitted)}) vs expected (~{len(ground_truth)})"
         )
 
-    # Relevance check: do any submitted path segments overlap with ground truth?
+    # Relevance check: how much do submitted path segments overlap with ground truth?
     gt_segments: set = set()
     for ep in ground_truth:
         gt_segments.update(_path_segments(ep["path"]))
@@ -438,6 +438,21 @@ def compute_penalty(
         if overlap == 0.0:
             penalty -= 0.2
             suggestions.append("No submitted paths match expected resources")
+        elif overlap < 0.3:
+            penalty -= 0.1
+            suggestions.append(
+                f"Low resource relevance ({overlap:.0%}): check resource names"
+            )
+
+    # Coverage ratio: scale penalty by how far under the expected count
+    if ground_truth:
+        ratio = len(submitted) / len(ground_truth)
+        if ratio < 0.5:
+            shortfall = round(0.15 * (1.0 - ratio), 4)
+            penalty -= shortfall
+            suggestions.append(
+                f"Too few endpoints ({len(submitted)} vs ~{len(ground_truth)} expected)"
+            )
 
     return round(max(penalty, 0.0), 4), suggestions
 
