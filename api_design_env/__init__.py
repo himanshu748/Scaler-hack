@@ -1,4 +1,4 @@
-from .models import ApiDesignAction, ApiDesignObservation, ApiDesignState
+from .models import ApiDesignAction, ApiDesignObservation, ApiDesignState, EndpointSpec
 from .client import ApiDesignEnv
 
 __all__ = [
@@ -6,4 +6,5 @@ __all__ = [
     "ApiDesignObservation",
     "ApiDesignState",
     "ApiDesignEnv",
+    "EndpointSpec",
 ]

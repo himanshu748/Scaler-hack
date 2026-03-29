@@ -360,6 +360,64 @@ def score_http_semantics(
 # ── Public API ──────────────────────────────────────────────────────
 
 
+# ── 6. Penalty detection ────────────────────────────────────────────
+
+
+def compute_penalty(
+    submitted: List[Dict[str, Any]],
+    ground_truth: List[Dict[str, Any]],
+) -> Tuple[float, List[str]]:
+    """
+    Detect clearly undesirable patterns and return a penalty multiplier
+    (1.0 = no penalty, <1.0 = penalised) plus suggestions.
+
+    Penalised behaviours:
+      - Empty submission
+      - Massive over-submission (>3x ground truth endpoints)
+      - Duplicate endpoints (same method+path)
+      - Completely irrelevant paths (0% overlap with ground truth segments)
+    """
+    suggestions: List[str] = []
+
+    if not submitted:
+        return 0.0, ["Empty submission: provide at least one endpoint"]
+
+    penalty = 1.0
+
+    # Duplicate check
+    sigs = [(ep.get("method", "").upper(), _normalise_path(ep.get("path", "")))
+            for ep in submitted]
+    dupes = len(sigs) - len(set(sigs))
+    if dupes > 0:
+        penalty -= 0.1 * min(dupes, 3)
+        suggestions.append(f"{dupes} duplicate endpoint(s) detected -- remove them")
+
+    # Over-submission (spam penalty)
+    if len(submitted) > 3 * len(ground_truth):
+        penalty -= 0.15
+        suggestions.append(
+            f"Too many endpoints ({len(submitted)}) vs expected (~{len(ground_truth)})"
+        )
+
+    # Relevance check: do any submitted path segments overlap with ground truth?
+    gt_segments: set = set()
+    for ep in ground_truth:
+        gt_segments.update(_path_segments(ep["path"]))
+    sub_segments: set = set()
+    for ep in submitted:
+        sub_segments.update(_path_segments(ep.get("path", "")))
+    if gt_segments and sub_segments:
+        overlap = len(gt_segments & sub_segments) / len(gt_segments)
+        if overlap == 0.0:
+            penalty -= 0.2
+            suggestions.append("No submitted paths match expected resources")
+
+    return round(max(penalty, 0.0), 4), suggestions
+
+
+# ── Public API ──────────────────────────────────────────────────────
+
+
 def grade(
     submitted: List[Dict[str, Any]],
     ground_truth: List[Dict[str, Any]],
@@ -370,7 +428,8 @@ def grade(
     Returns:
         {
             "scores": {dim: float, ...},
-            "total": float,
+            "penalty": float,          # 1.0 = no penalty, <1.0 = penalised
+            "total": float,            # weighted score * penalty
             "suggestions": [str, ...],
         }
     """
@@ -388,6 +447,7 @@ def grade(
     schema, s3 = score_schema_quality(submitted_dicts, ground_truth)
     consistency, s4 = score_consistency(submitted_dicts)
     semantics, s5 = score_http_semantics(submitted_dicts, ground_truth)
+    penalty, s6 = compute_penalty(submitted_dicts, ground_truth)
 
     scores = {
         "completeness": completeness,
@@ -397,10 +457,10 @@ def grade(
         "http_semantics": semantics,
     }
 
-    total = sum(scores[k] * WEIGHTS[k] for k in scores)
+    raw_total = sum(scores[k] * WEIGHTS[k] for k in scores)
+    total = raw_total * penalty
 
-    all_suggestions = s1 + s2 + s3 + s4 + s5
-    # Deduplicate and limit
+    all_suggestions = s6 + s1 + s2 + s3 + s4 + s5  # penalties first
     seen = set()
     unique: List[str] = []
     for s in all_suggestions:
@@ -410,6 +470,7 @@ def grade(
 
     return {
         "scores": scores,
+        "penalty": penalty,
         "total": round(total, 4),
         "suggestions": unique[:10],
     }

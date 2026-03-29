@@ -143,6 +143,97 @@ class TestEnvironment:
         assert env.state.best_score >= score1
 
 
+    def test_reset_with_difficulty(self):
+        env = ApiDesignEnvironment()
+        obs = env.reset(difficulty="easy")
+        assert env.state.difficulty == "easy"
+        obs = env.reset(difficulty="hard")
+        assert env.state.difficulty == "hard"
+
+    def test_reset_with_problem_id(self):
+        env = ApiDesignEnvironment()
+        obs = env.reset(problem_id="todo_crud")
+        assert env.state.problem_id == "todo_crud"
+        assert env.state.difficulty == "easy"
+
+    def test_reset_invalid_difficulty_raises(self):
+        env = ApiDesignEnvironment()
+        with pytest.raises(ValueError):
+            env.reset(difficulty="impossible")
+
+    def test_reset_invalid_problem_id_raises(self):
+        env = ApiDesignEnvironment()
+        with pytest.raises(ValueError):
+            env.reset(problem_id="nonexistent_problem")
+
+    def test_custom_max_attempts(self):
+        env = ApiDesignEnvironment()
+        obs = env.reset(max_attempts=2)
+        assert obs.max_attempts == 2
+        action = ApiDesignAction(
+            endpoints=[EndpointSpec(method="GET", path="/x", description="x")]
+        )
+        env.step(action)
+        obs = env.step(action)
+        assert obs.done is True
+        assert obs.attempt_number == 2
+
+    def test_improvement_reward_bonus(self):
+        env = ApiDesignEnvironment()
+        env.reset(seed=1, problem_id="todo_crud")
+        problem = get_problem("todo_crud")
+
+        # First step: bad submission
+        bad = ApiDesignAction(
+            endpoints=[EndpointSpec(method="GET", path="/x", description="x")]
+        )
+        obs1 = env.step(bad)
+        r1 = obs1.reward
+
+        # Second step: perfect submission (big improvement)
+        eps = [
+            EndpointSpec(
+                method=ep["method"], path=ep["path"],
+                description=ep.get("description", ""),
+                request_body=ep.get("request_body", {}),
+                response_body=ep.get("response_body", {}),
+                status_code=ep.get("status_code", 200),
+                query_params=ep.get("query_params", []),
+            )
+            for ep in problem["ground_truth"]
+        ]
+        obs2 = env.step(ApiDesignAction(endpoints=eps))
+        # Shaped reward should be > raw total_score due to improvement bonus
+        assert obs2.reward > obs2.total_score
+
+
+class TestGraderPenalties:
+    def test_empty_submission_penalty(self):
+        problem = get_problem("todo_crud")
+        result = grade([], problem["ground_truth"])
+        assert result["penalty"] == 0.0
+        assert result["total"] == 0.0
+
+    def test_duplicate_endpoints_penalised(self):
+        problem = get_problem("todo_crud")
+        ep = problem["ground_truth"][0]
+        duped = [ep, ep, ep]
+        result = grade(duped, problem["ground_truth"])
+        assert result["penalty"] < 1.0
+        assert any("duplicate" in s.lower() for s in result["suggestions"])
+
+    def test_over_submission_penalised(self):
+        problem = get_problem("contacts_api")  # 5 endpoints
+        bloated = problem["ground_truth"] * 5  # 25 endpoints
+        result = grade(bloated, problem["ground_truth"])
+        assert result["penalty"] < 1.0
+
+    def test_no_penalty_for_good_submission(self):
+        problem = get_problem("todo_crud")
+        result = grade(problem["ground_truth"], problem["ground_truth"])
+        assert result["penalty"] == 1.0
+
+
 class TestProblems:
     def test_problem_count(self):
         assert len(PROBLEMS) >= 10
@@ -158,6 +249,17 @@ class TestProblems:
     def test_unique_ids(self):
         ids = [p["id"] for p in PROBLEMS]
         assert len(ids) == len(set(ids))
+
+
+class TestBaseline:
+    def test_baseline_runs(self):
+        from api_design_env.baseline import run_baseline
+        summary = run_baseline(difficulty_filter="easy", seed=42)
+        assert "random" in summary
+        assert "heuristic" in summary
+        assert "oracle" in summary
+        assert summary["oracle"]["mean_score"] >= 0.95
+        assert summary["random"]["mean_score"] < summary["oracle"]["mean_score"]
 
 
 if __name__ == "__main__":
