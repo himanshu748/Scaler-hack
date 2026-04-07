@@ -188,11 +188,14 @@ def main() -> None:
     episodes: List[Dict[str, Any]] = []
 
     for i in range(n_episodes):
+        problem = PROBLEMS[i % len(PROBLEMS)]
+        pid = problem["id"]
+        diff = problem["difficulty"]
+        step_count = 0
+        score = 0.0
+
         try:
-            problem = PROBLEMS[i % len(PROBLEMS)]
-            pid = problem["id"]
-            diff = problem["difficulty"]
-            print(f"  [{i+1}/{n_episodes}] {pid} ({diff})...", end=" ", flush=True)
+            print(f"[START] task={pid}", flush=True)
 
             obs = env.reset(problem_id=pid)
 
@@ -206,8 +209,13 @@ def main() -> None:
                 action = ApiDesignAction(endpoints=heuristic_agent(obs.requirements, obs.constraints))
 
             obs = env.step(action)
+            step_count = 1
             score = obs.total_score or 0.0
-            print(f"score={score:.4f}  ({len(action.endpoints)} endpoints)")
+            reward = obs.reward or 0.0
+
+            print(f"[STEP] step={step_count} reward={reward}", flush=True)
+            print(f"[END] task={pid} score={score} steps={step_count}", flush=True)
+
             episodes.append({
                 "problem_id": pid,
                 "difficulty": diff,
@@ -215,8 +223,9 @@ def main() -> None:
                 "n_endpoints": len(action.endpoints),
             })
         except Exception as e:
-            print(f"ERROR: {e}")
-            episodes.append({"problem_id": "unknown", "score": 0.0, "error": str(e)})
+            print(f"[STEP] step=1 reward=0.0", flush=True)
+            print(f"[END] task={pid} score=0.0 steps=1", flush=True)
+            episodes.append({"problem_id": pid, "score": 0.0, "error": str(e)})
 
     scores = [e.get("score", 0.0) or 0.0 for e in episodes]
 
