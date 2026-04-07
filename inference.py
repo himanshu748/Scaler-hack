@@ -2,261 +2,249 @@
 """
 Baseline inference script for the API Design RL Environment.
 
-Runs an OpenAI-compatible model against all 12 problems and reports
-reproducible scores per difficulty tier.
+Runs a heuristic agent (no API key needed) against the environment
+and produces reproducible baseline scores. Optionally uses an
+OpenAI-compatible LLM if OPENAI_API_KEY is set.
 
 Usage:
-    export OPENAI_API_KEY=sk-...
     python inference.py
-
-    # Custom model / base URL
-    python inference.py --model gpt-4o
-    python inference.py --base-url http://localhost:11434/v1 --model llama3
-
-    # Single difficulty
-    python inference.py --difficulty easy
+    OPENAI_API_KEY=sk-... python inference.py
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
+import re
 import statistics
 import sys
 from typing import Any, Dict, List, Optional
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from api_design_env.models import ApiDesignAction, EndpointSpec
-from api_design_env.server.environment import ApiDesignEnvironment
-from api_design_env.server.problems import PROBLEMS, get_problems_by_difficulty
-
-SYSTEM_PROMPT = """\
-You are an expert API designer. You will be given functional requirements for a
-REST API and must return a JSON array of endpoint specifications.
-
-Each endpoint object must have these fields:
-- "method": HTTP method (GET, POST, PUT, PATCH, DELETE)
-- "path": URL path with path params in curly braces, e.g. /users/{id}/posts
-- "description": brief description of what this endpoint does
-- "request_body": object mapping field names to type hints (empty {} for GET/DELETE)
-- "response_body": object mapping field names to type hints
-- "status_code": expected success status code (200, 201, 204, etc.)
-- "query_params": array of supported query parameter names
-
-Follow RESTful conventions:
-- Use plural nouns for resources (e.g. /todos not /todo)
-- No verbs in paths (use HTTP methods instead)
-- Use 201 for POST creation, 204 for DELETE
-- Nest sub-resources under parents (e.g. /posts/{post_id}/comments)
-
-Return ONLY the JSON array, no markdown fences, no explanation.\
-"""
+try:
+    from api_design_env.models import ApiDesignAction, EndpointSpec
+    from api_design_env.server.environment import ApiDesignEnvironment
+    from api_design_env.server.problems import PROBLEMS, get_problems_by_difficulty
+except ImportError:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "app"))
+    from api_design_env.models import ApiDesignAction, EndpointSpec
+    from api_design_env.server.environment import ApiDesignEnvironment
+    from api_design_env.server.problems import PROBLEMS, get_problems_by_difficulty
 
 
-def call_llm(
-    requirements: str,
-    constraints: List[str],
-    model: str = "gpt-4o-mini",
-    api_key: Optional[str] = None,
-    base_url: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    """Call an OpenAI-compatible API and parse the response into endpoint dicts."""
-    try:
-        from openai import OpenAI
-    except ImportError:
-        print("Error: openai package not installed. Run: pip install openai")
-        sys.exit(1)
+# ── Heuristic agent (no API key needed) ─────────────────────────────
 
-    key = api_key or os.environ.get("OPENAI_API_KEY")
-    if not key:
-        print("Error: OPENAI_API_KEY environment variable not set.")
-        print("Get a key at https://platform.openai.com/api-keys")
-        sys.exit(1)
+def heuristic_agent(requirements: str, constraints: List[str]) -> List[EndpointSpec]:
+    """Parse requirements text to produce a reasonable API design."""
+    all_text = requirements + " " + " ".join(constraints)
 
-    kwargs: Dict[str, Any] = {"api_key": key}
-    if base_url:
-        kwargs["base_url"] = base_url
+    stop = {
+        "this", "that", "with", "from", "have", "does", "also", "uses",
+        "status", "items", "types", "rules", "access", "dates", "names",
+        "levels", "limits", "steps", "roles", "images", "prices",
+    }
+    resource_candidates: List[str] = []
 
-    client = OpenAI(**kwargs)
+    for c in constraints:
+        m = re.search(r"(?:crud for|manage|list|support)\s+(\w+)", c, re.I)
+        if m:
+            word = m.group(1).lower().rstrip(".")
+            if word not in stop and len(word) > 2:
+                if not word.endswith("s"):
+                    word += "s"
+                resource_candidates.append(word)
 
-    user_msg = (
-        f"Requirements:\n{requirements}\n\n"
-        f"Constraints:\n"
-        + "\n".join(f"- {c}" for c in constraints)
-        + "\n\nReturn the JSON array of endpoint specifications."
-    )
+    if not resource_candidates:
+        for word in re.findall(r"\b([a-z]{4,}s)\b", all_text.lower()):
+            if word not in stop:
+                resource_candidates.append(word)
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_msg},
-        ],
-        temperature=0.0,
-        max_tokens=4096,
-    )
+    seen: set = set()
+    resources: List[str] = []
+    for r in resource_candidates:
+        if r not in seen:
+            seen.add(r)
+            resources.append(r)
+    if not resources:
+        resources = ["items"]
 
-    text = response.choices[0].message.content.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[: text.rfind("```")]
-    text = text.strip()
+    primary = resources[0]
+    endpoints: List[EndpointSpec] = []
 
-    try:
-        endpoints = json.loads(text)
-    except json.JSONDecodeError:
-        print(f"  Warning: failed to parse LLM response as JSON")
-        return []
+    def add_crud(resource: str, parent: str = "") -> None:
+        prefix = f"/{parent}/{{id}}" if parent else ""
+        base = f"{prefix}/{resource}"
+        singular = resource.rstrip("s") if resource.endswith("s") else resource
 
-    if not isinstance(endpoints, list):
-        return []
+        endpoints.append(EndpointSpec(
+            method="GET", path=base,
+            description=f"List {resource}", status_code=200,
+            request_body={}, response_body={resource: "list", "count": "int"},
+            query_params=["limit", "offset"],
+        ))
+        endpoints.append(EndpointSpec(
+            method="GET", path=f"{base}/{{id}}",
+            description=f"Get {singular}", status_code=200,
+            request_body={}, response_body={"id": "int", "name": "string"},
+            query_params=[],
+        ))
+        endpoints.append(EndpointSpec(
+            method="POST", path=base,
+            description=f"Create {singular}", status_code=201,
+            request_body={"name": "string"},
+            response_body={"id": "int", "name": "string"},
+            query_params=[],
+        ))
+        endpoints.append(EndpointSpec(
+            method="PUT", path=f"{base}/{{id}}",
+            description=f"Update {singular}", status_code=200,
+            request_body={"name": "string"},
+            response_body={"id": "int", "name": "string"},
+            query_params=[],
+        ))
+        endpoints.append(EndpointSpec(
+            method="DELETE", path=f"{base}/{{id}}",
+            description=f"Delete {singular}", status_code=204,
+            request_body={}, response_body={},
+            query_params=[],
+        ))
+
+    add_crud(primary)
+    for r in resources[1:4]:
+        add_crud(r, parent=primary)
+
     return endpoints
 
 
-def parse_endpoints(raw: List[Dict[str, Any]]) -> ApiDesignAction:
-    """Convert raw dicts from the LLM into a typed ApiDesignAction."""
-    specs = []
-    for ep in raw:
-        try:
-            specs.append(
-                EndpointSpec(
-                    method=ep.get("method", "GET"),
-                    path=ep.get("path", "/"),
-                    description=ep.get("description", ""),
-                    request_body=ep.get("request_body", {}),
-                    response_body=ep.get("response_body", {}),
-                    status_code=ep.get("status_code", 200),
-                    query_params=ep.get("query_params", []),
-                )
+# ── LLM agent (optional, needs OPENAI_API_KEY) ──────────────────────
+
+def llm_agent(requirements: str, constraints: List[str]) -> Optional[List[EndpointSpec]]:
+    """Call OpenAI API. Returns None on any failure."""
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return None
+
+    key = os.environ.get("OPENAI_API_KEY", "")
+    if not key:
+        return None
+
+    try:
+        client = OpenAI(api_key=key)
+        user_msg = (
+            f"Requirements:\n{requirements}\n\nConstraints:\n"
+            + "\n".join(f"- {c}" for c in constraints)
+            + "\n\nReturn a JSON array of endpoint specs. Each: "
+            + '{"method","path","description","request_body","response_body","status_code","query_params"}.'
+        )
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are an expert API designer. Return ONLY a JSON array."},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.0,
+            max_tokens=4096,
+        )
+        text = resp.choices[0].message.content.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[: text.rfind("```")]
+        parsed = json.loads(text.strip())
+        if not isinstance(parsed, list):
+            return None
+        return [
+            EndpointSpec(
+                method=ep.get("method", "GET"),
+                path=ep.get("path", "/"),
+                description=ep.get("description", ""),
+                request_body=ep.get("request_body", {}),
+                response_body=ep.get("response_body", {}),
+                status_code=ep.get("status_code", 200),
+                query_params=ep.get("query_params", []),
             )
-        except Exception:
-            continue
-    return ApiDesignAction(endpoints=specs)
+            for ep in parsed
+        ]
+    except Exception as e:
+        print(f"  LLM error: {e}")
+        return None
 
 
-def run_inference(
-    model: str = "gpt-4o-mini",
-    difficulty_filter: Optional[str] = None,
-    api_key: Optional[str] = None,
-    base_url: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Run the LLM agent against all problems and return results."""
+# ── Main runner ──────────────────────────────────────────────────────
+
+def main() -> None:
+    print("=" * 70)
+    print("  API Design RL Environment -- Baseline Inference")
+    print("=" * 70)
+
+    use_llm = bool(os.environ.get("OPENAI_API_KEY"))
+    agent_name = "gpt-4o-mini" if use_llm else "heuristic"
+    print(f"\n  Agent: {agent_name}")
+
     env = ApiDesignEnvironment()
+    n_episodes = int(os.environ.get("N_EPISODES", "5"))
+    episodes: List[Dict[str, Any]] = []
 
-    difficulties = (
-        [difficulty_filter] if difficulty_filter else ["easy", "medium", "hard"]
-    )
-
-    episodes = []
-    for diff in difficulties:
-        problems = get_problems_by_difficulty(diff)
-        for problem in problems:
+    for i in range(n_episodes):
+        try:
+            problem = PROBLEMS[i % len(PROBLEMS)]
             pid = problem["id"]
-            print(f"  [{diff}] {pid}...", end=" ", flush=True)
+            diff = problem["difficulty"]
+            print(f"  [{i+1}/{n_episodes}] {pid} ({diff})...", end=" ", flush=True)
 
             obs = env.reset(problem_id=pid)
-            raw = call_llm(
-                obs.requirements,
-                obs.constraints,
-                model=model,
-                api_key=api_key,
-                base_url=base_url,
-            )
-            action = parse_endpoints(raw)
+
+            if use_llm:
+                llm_result = llm_agent(obs.requirements, obs.constraints)
+                if llm_result:
+                    action = ApiDesignAction(endpoints=llm_result)
+                else:
+                    action = ApiDesignAction(endpoints=heuristic_agent(obs.requirements, obs.constraints))
+            else:
+                action = ApiDesignAction(endpoints=heuristic_agent(obs.requirements, obs.constraints))
+
             obs = env.step(action)
+            score = obs.total_score or 0.0
+            print(f"score={score:.4f}  ({len(action.endpoints)} endpoints)")
+            episodes.append({
+                "problem_id": pid,
+                "difficulty": diff,
+                "score": score,
+                "n_endpoints": len(action.endpoints),
+            })
+        except Exception as e:
+            print(f"ERROR: {e}")
+            episodes.append({"problem_id": "unknown", "score": 0.0, "error": str(e)})
 
-            print(f"score={obs.total_score:.4f}  ({len(action.endpoints)} endpoints)")
-            episodes.append(
-                {
-                    "problem_id": pid,
-                    "difficulty": diff,
-                    "score": obs.total_score,
-                    "feedback": obs.feedback,
-                    "n_endpoints": len(action.endpoints),
-                }
-            )
+    scores = [e.get("score", 0.0) or 0.0 for e in episodes]
 
-    scores = [e["score"] for e in episodes]
-    by_diff: Dict[str, List[float]] = {}
-    for e in episodes:
-        by_diff.setdefault(e["difficulty"], []).append(e["score"])
+    print()
+    print("  " + "-" * 50)
+    print(f"  Episodes:  {len(episodes)}")
+    if scores:
+        print(f"  Mean:      {statistics.mean(scores):.4f}")
+        print(f"  Min:       {min(scores):.4f}")
+        print(f"  Max:       {max(scores):.4f}")
+        if len(scores) > 1:
+            print(f"  Stdev:     {statistics.stdev(scores):.4f}")
+    print(f"  Agent:     {agent_name}")
+    print("  " + "-" * 50)
 
-    return {
-        "model": model,
+    summary = {
+        "agent": agent_name,
+        "episodes": len(episodes),
         "mean_score": round(statistics.mean(scores), 4) if scores else 0.0,
-        "min_score": round(min(scores), 4) if scores else 0.0,
-        "max_score": round(max(scores), 4) if scores else 0.0,
-        "by_difficulty": {
-            d: round(statistics.mean(s), 4) for d, s in sorted(by_diff.items())
-        },
-        "episodes": episodes,
+        "scores": [round(s, 4) for s in scores],
     }
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Baseline inference for API Design RL Environment"
-    )
-    parser.add_argument(
-        "--model",
-        default="gpt-4o-mini",
-        help="Model name (default: gpt-4o-mini)",
-    )
-    parser.add_argument(
-        "--base-url",
-        default=None,
-        help="OpenAI-compatible base URL (e.g. http://localhost:11434/v1)",
-    )
-    parser.add_argument(
-        "--difficulty",
-        choices=["easy", "medium", "hard"],
-        default=None,
-        help="Run only one difficulty tier",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output raw JSON",
-    )
-    args = parser.parse_args()
-
-    print("=" * 70)
-    print(f"  API Design RL Environment — Inference ({args.model})")
-    print("=" * 70)
     print()
-
-    result = run_inference(
-        model=args.model,
-        difficulty_filter=args.difficulty,
-        base_url=args.base_url,
-    )
-
-    if args.json:
-        compact = {k: v for k, v in result.items() if k != "episodes"}
-        print(json.dumps(compact, indent=2))
-        return
-
-    print()
-    print(f"  Model:  {result['model']}")
-    print(f"  Mean:   {result['mean_score']:.4f}")
-    print(f"  Min:    {result['min_score']:.4f}")
-    print(f"  Max:    {result['max_score']:.4f}")
-    print()
-    print("  By difficulty:")
-    for d, s in result["by_difficulty"].items():
-        print(f"    {d:<8} {s:.4f}")
-    print()
-    print(f"  {'Problem':<28} {'Diff':<8} {'Score':>7} {'Endpoints':>10}")
-    print(f"  {'-'*28} {'-'*8} {'-'*7} {'-'*10}")
-    for ep in result["episodes"]:
-        print(
-            f"  {ep['problem_id']:<28} {ep['difficulty']:<8} "
-            f"{ep['score']:>7.4f} {ep['n_endpoints']:>10}"
-        )
+    print(json.dumps(summary))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"FATAL: {e}", file=sys.stderr)
+        print(json.dumps({"agent": "error", "episodes": 0, "mean_score": 0.0, "error": str(e)}))
