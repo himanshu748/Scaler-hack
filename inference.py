@@ -117,21 +117,32 @@ def heuristic_agent(requirements: str, constraints: List[str]) -> List[EndpointS
     return endpoints
 
 
-# ── LLM agent (optional, needs OPENAI_API_KEY) ──────────────────────
+# ── LLM agent ────────────────────────────────────────────────────────
 
-def llm_agent(requirements: str, constraints: List[str]) -> Optional[List[EndpointSpec]]:
-    """Call OpenAI API. Returns None on any failure."""
+def _get_llm_config() -> Optional[Dict[str, str]]:
+    """Return LLM config from env vars, or None if unavailable."""
+    # Validator-injected proxy (preferred)
+    base_url = os.environ.get("API_BASE_URL", "")
+    api_key = os.environ.get("API_KEY", "")
+    if base_url and api_key:
+        return {"base_url": base_url, "api_key": api_key}
+    # Fallback: standard OpenAI key
+    oai_key = os.environ.get("OPENAI_API_KEY", "")
+    if oai_key:
+        return {"api_key": oai_key}
+    return None
+
+
+def llm_agent(requirements: str, constraints: List[str], llm_cfg: Dict[str, str]) -> Optional[List[EndpointSpec]]:
+    """Call LLM via provided config. Returns None on any failure."""
     try:
         from openai import OpenAI
     except ImportError:
         return None
 
-    key = os.environ.get("OPENAI_API_KEY", "")
-    if not key:
-        return None
-
     try:
-        client = OpenAI(api_key=key)
+        client = OpenAI(**llm_cfg)
+        model = os.environ.get("MODEL", "gpt-4o-mini")
         user_msg = (
             f"Requirements:\n{requirements}\n\nConstraints:\n"
             + "\n".join(f"- {c}" for c in constraints)
@@ -139,7 +150,7 @@ def llm_agent(requirements: str, constraints: List[str]) -> Optional[List[Endpoi
             + '{"method","path","description","request_body","response_body","status_code","query_params"}.'
         )
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[
                 {"role": "system", "content": "You are an expert API designer. Return ONLY a JSON array."},
                 {"role": "user", "content": user_msg},
@@ -168,7 +179,7 @@ def llm_agent(requirements: str, constraints: List[str]) -> Optional[List[Endpoi
             for ep in parsed
         ]
     except Exception as e:
-        print(f"  LLM error: {e}")
+        print(f"  LLM error: {e}", flush=True)
         return None
 
 
@@ -179,9 +190,11 @@ def main() -> None:
     print("  API Design RL Environment -- Baseline Inference")
     print("=" * 70)
 
-    use_llm = bool(os.environ.get("OPENAI_API_KEY"))
-    agent_name = "gpt-4o-mini" if use_llm else "heuristic"
-    print(f"\n  Agent: {agent_name}")
+    llm_cfg = _get_llm_config()
+    agent_name = "llm" if llm_cfg else "heuristic"
+    print(f"\n  Agent: {agent_name}", flush=True)
+    if llm_cfg:
+        print(f"  API_BASE_URL: {llm_cfg.get('base_url', 'default')}", flush=True)
 
     env = ApiDesignEnvironment()
     n_episodes = int(os.environ.get("N_EPISODES", "5"))
@@ -199,8 +212,8 @@ def main() -> None:
 
             obs = env.reset(problem_id=pid)
 
-            if use_llm:
-                llm_result = llm_agent(obs.requirements, obs.constraints)
+            if llm_cfg:
+                llm_result = llm_agent(obs.requirements, obs.constraints, llm_cfg)
                 if llm_result:
                     action = ApiDesignAction(endpoints=llm_result)
                 else:
