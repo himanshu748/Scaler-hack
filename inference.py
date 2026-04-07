@@ -2,13 +2,12 @@
 """
 Baseline inference script for the API Design RL Environment.
 
-Runs a heuristic agent (no API key needed) against the environment
-and produces reproducible baseline scores. Optionally uses an
-OpenAI-compatible LLM if OPENAI_API_KEY is set.
-
-Usage:
-    python inference.py
-    OPENAI_API_KEY=sk-... python inference.py
+Uses the validator-injected environment variables:
+    API_BASE_URL  - LiteLLM proxy base URL
+    API_KEY       - API key for the proxy
+    MODEL_NAME    - Model to use (e.g. gpt-4o-mini)
+    HF_TOKEN      - Hugging Face token (if needed)
+    LOCAL_IMAGE_NAME - Local Docker image name (if running locally)
 """
 
 from __future__ import annotations
@@ -19,6 +18,13 @@ import re
 import statistics
 import sys
 from typing import Any, Dict, List, Optional
+
+# Validator-injected env vars
+API_BASE_URL = os.getenv("API_BASE_URL", "")
+API_KEY = os.getenv("API_KEY", "")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.getenv("HF_TOKEN", "")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME", "")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -122,10 +128,8 @@ def heuristic_agent(requirements: str, constraints: List[str]) -> List[EndpointS
 def _get_llm_config() -> Optional[Dict[str, str]]:
     """Return LLM config from env vars, or None if unavailable."""
     # Validator-injected proxy (preferred)
-    base_url = os.environ.get("API_BASE_URL", "")
-    api_key = os.environ.get("API_KEY", "")
-    if base_url and api_key:
-        return {"base_url": base_url, "api_key": api_key}
+    if API_BASE_URL and API_KEY:
+        return {"base_url": API_BASE_URL, "api_key": API_KEY}
     # Fallback: standard OpenAI key
     oai_key = os.environ.get("OPENAI_API_KEY", "")
     if oai_key:
@@ -142,7 +146,7 @@ def llm_agent(requirements: str, constraints: List[str], llm_cfg: Dict[str, str]
 
     try:
         client = OpenAI(**llm_cfg)
-        model = os.environ.get("MODEL", "gpt-4o-mini")
+        model = MODEL_NAME
         user_msg = (
             f"Requirements:\n{requirements}\n\nConstraints:\n"
             + "\n".join(f"- {c}" for c in constraints)
